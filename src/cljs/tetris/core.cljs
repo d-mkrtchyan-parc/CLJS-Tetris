@@ -3,7 +3,7 @@
 	; описываем все зависимости
   (:require [clojure.browser.event :as event]
             [clojure.string :as string]
-            [tailrecursion.javelin]
+            [tailrecursion.javelin :refer [cell]]
             [tetris.utils :as utils]
             [dommy.core :as dommy])
 	
@@ -15,7 +15,7 @@
         [domina.xpath :only [xpath]])
 	
 	; и макросы из библиотек
-  (:require-macros [tailrecursion.javelin :refer [cell defc defc= cell=]]
+  (:require-macros [tailrecursion.javelin :refer [defc defc= cell=]]
                    [dommy.macros :refer [node]]))
 
 ; вызывает fn count раз
@@ -38,19 +38,20 @@
 ; Замыкающая функция суммирования дж
 (defn add[x] #(+ x %))
 
-(defn fall![coordinate dependency]
-	(swap! coordinate inc))
 
-; Задаем такты
-(js/setInterval #(swap! ticks (add 1000)) 1000)
 
 (defn redraw![element color]
 	(let [col (get element :x)
-				row (get element :y)]
-		(set-styles! (->
-			(xpath (str "//div[@class='line'][" row "]"))
-			(xpath (str "div[@class='cell'][" col "]"))
-		) {:background-color color})))
+				row (get element :y)
+				before (->
+					(sel (str "div.line:nth-child(" row ")"))
+					(sel (str "div.cell:nth-child(" (inc col) ")")))
+				el (->
+					(sel (str "div.line:nth-child(" (inc row) ")"))
+					(sel (str "div.cell:nth-child(" (inc col) ")")))]
+		
+		(set-styles! before {:background-color "#eee"})
+		(set-styles! el {:background-color color})))
 
 ; То что происходит по onload body
 (defn ^:export start [width height]
@@ -62,15 +63,19 @@
 	(defc board [lines])
 	
 	; Какой-то жесткий гемморой
-	(def x (cell  0))
-	(def y (cell 0))
-	(def block (cell= {:x x :y y}))
+	(def block-x (cell 0))
+	(def block-y (cell 0))
+	(def block (cell= {:x block-x :y block-y}))
 	
 	; side effects
 	
+	; Задаем такты
+	(js/setInterval #(do
+										 (swap! ticks (add 1000))
+										 (swap! block-y inc)) 1000)
+	
 	; логируем такты
 	(cell= (#(.log js/console ticks)))
-	(cell= (fall! y ticks))
 	(cell= (redraw! block "#666")))
 	
 	
