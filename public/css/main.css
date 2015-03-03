@@ -1,0 +1,25 @@
+.center{
+	text-align: center;
+}
+
+#game{
+	padding: 10px;
+}
+
+.line{
+	display: block;
+	height: 16px;
+}
+
+.cell {
+	display: inline-block;
+	width: 15px;
+	height: 15px;
+	margin-right: 1px;
+	margin-bottom: 1px;
+	background: #eee;
+}
+
+.block {
+	background: #666;
+}
