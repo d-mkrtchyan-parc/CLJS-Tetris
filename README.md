@@ -3,5 +3,5 @@
 ```
 
 apt-get install leiningen
-cd tetris
+cd CLJS-tetris./
 lein cljsbuild once

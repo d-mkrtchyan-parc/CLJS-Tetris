@@ -26,19 +26,23 @@
 			(gen! (dec count) fn)) 
 		nil))
 
-; предикат keyCode -> boolean
+; Предикат на проверку движения влево впрааво
 (defn move? [code]
-  "Predicate to know does the keycode arrow button code"
   (or (== code 37) (== code 39)))
 
+; Направление движения
+(defn direction[code]( if (== code 39) 1 (if (== code 37) -1 nil)))
 
-
-
-; Замыкающая функция суммирования дж
+; Замыкающая функция суммирования джвух аргументов
 (defn add[x] #(+ x %))
 
-; Направление
-(defn direction[code]( if (== code 39) 1 (if (== code 37) -1 nil)))
+; всегда возвращает obj ячейку в деструктурированном виде
+(defn always![obj]
+	(let [o (.-state obj)
+				x (get o :x)
+				y (get o :y)
+				res {:x x :y y}] (fn[]res)))
+
 
 ; ячейки
 (def ticks (cell 0))
@@ -56,12 +60,6 @@
 					(sel (str "div.cell:nth-child(" (inc col) ")")))]
 		
 		(set-styles! el {:background-color color})))
-
-(defn always![obj]
-	(let [o (.-state obj)
-				x (get o :x)
-				y (get o :y)
-				res {:x x :y y}] (fn[]res)))
 
 ; То что происходит по onload body
 (defn ^:export start [width height]
@@ -93,6 +91,7 @@
 			(swap! ticks (add 1000))
 			(swap! block-y inc)) 1000)
 	
+	; Задаем прослушку 
 	(.addEventListener js/document "keydown" move!)
 	
 	; логируем такты
