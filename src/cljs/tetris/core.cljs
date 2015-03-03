@@ -51,6 +51,54 @@
 (def block (cell= {:x block-x :y block-y}))
 (def before (cell {:x 0 :y -1}))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; создаем объект
+(def objectmap
+	[
+			;dot
+			[{:x 0 :y 0}]
+		
+			;two-dot
+			[
+				{:x 0 :y -1}
+				{:x 0 :y 0}
+			]
+		
+			;stick
+			[
+				{:x 0 :y -3}
+				{:x 0 :y -2}
+				{:x 0 :y -1}
+				{:x 0 :y 0}
+			]
+		
+			;square
+			[
+				{:x 0 :y 0}
+				{:x 0 :y -1}
+				{:x -1 :y 0}
+				{:x -1 :y -1}
+			]
+			
+			;L 
+			[
+				{:x 0 :y -2}
+				{:x 0 :y -1}
+				{:x 0 :y 0}
+				{:x 1 :y 0}
+			]
+		])
+
+; Создает новый объект на основе заданной ширины и высоты поля
+(defn new-object[w h]
+	(let [center (dec (Math/ceil (/ w 2))) 
+				obj (dec (Math/ceil (* 5 (Math/random))))] 
+		(mapv #(let [x (get % :x)] {:x (+ x center) :y (get % :y)}) obj)))
+
+(defn to-object[blocks]
+	(cell= (mapv #(cell %) blocks))
+	
+
+
 ;перерисовка
 (defn redraw![element color]
 	(let [col (get element :x)
