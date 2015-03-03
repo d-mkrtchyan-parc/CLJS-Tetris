@@ -27,31 +27,41 @@
 		nil))
 
 ; предикат keyCode -> boolean
-(defn arrow? [code]
+(defn move? [code]
   "Predicate to know does the keycode arrow button code"
-  (and (>= code 37) (<= code 40)))
+  (or (== code 37) (== code 39)))
 
 
-(defc current {:x -1 :y -1})
-(defc ticks 0)
+
 
 ; Замыкающая функция суммирования дж
 (defn add[x] #(+ x %))
 
+; Направление
+(defn direction[code]( if (== code 39) 1 (if (== code 37) -1 nil)))
 
+; ячейки
+(def ticks (cell 0))
+(def block-x (cell 0))
+(def block-y (cell 0))
+(def block (cell= {:x block-x :y block-y}))
+(def before (cell {:x 0 :y -1}))
 
+;перерисовка
 (defn redraw![element color]
 	(let [col (get element :x)
 				row (get element :y)
-				before (->
-					(sel (str "div.line:nth-child(" row ")"))
-					(sel (str "div.cell:nth-child(" (inc col) ")")))
 				el (->
 					(sel (str "div.line:nth-child(" (inc row) ")"))
 					(sel (str "div.cell:nth-child(" (inc col) ")")))]
 		
-		(set-styles! before {:background-color "#eee"})
 		(set-styles! el {:background-color color})))
+
+(defn always![obj]
+	(let [o (.-state obj)
+				x (get o :x)
+				y (get o :y)
+				res {:x x :y y}] (fn[]res)))
 
 ; То что происходит по onload body
 (defn ^:export start [width height]
@@ -62,20 +72,33 @@
 	(defc lines [])
 	(defc board [lines])
 	
-	; Какой-то жесткий гемморой
-	(def block-x (cell 0))
-	(def block-y (cell 0))
-	(def block (cell= {:x block-x :y block-y}))
+	(defn allowed?[direction]
+		(let [newx (+ direction (.-state block-x))]
+			(if (and (>= newx 0) (< newx width)) direction false )))
 	
-	; side effects
+	(defn move![obj]
+		(let [code (.-keyCode obj)]
+			(if (move? code) 
+				(do
+					(swap! before (always! block))
+					(swap! block-x (add (allowed? (direction code)))) nil))))
+
 	
-	; Задаем такты
-	(js/setInterval #(do
-										 (swap! ticks (add 1000))
-										 (swap! block-y inc)) 1000)
+	; side effects	
+	
+	; Задаем такты	
+	(js/setInterval 
+		#(do
+			(swap! before (always! block))
+			(swap! ticks (add 1000))
+			(swap! block-y inc)) 1000)
+	
+	(.addEventListener js/document "keydown" move!)
 	
 	; логируем такты
 	(cell= (#(.log js/console ticks)))
+	
+	(cell= (redraw! before "#eee"))
 	(cell= (redraw! block "#666")))
 	
 	

@@ -35036,28 +35036,51 @@ tetris.core.gen_BANG_ = function gen_BANG_(count, fn) {
     return null
   }
 };
-tetris.core.arrow_QMARK_ = function arrow_QMARK_(code) {
-  var and__3941__auto__ = code >= 37;
-  if(and__3941__auto__) {
-    return code <= 40
+tetris.core.move_QMARK_ = function move_QMARK_(code) {
+  var or__3943__auto__ = code === 37;
+  if(or__3943__auto__) {
+    return or__3943__auto__
   }else {
-    return and__3941__auto__
+    return code === 39
   }
 };
-tetris.core.current = tailrecursion.javelin.cell.call(null, cljs.core.PersistentArrayMap.fromArray(["\ufdd0:x", -1, "\ufdd0:y", -1], true));
-tetris.core.ticks = tailrecursion.javelin.cell.call(null, 0);
 tetris.core.add = function add(x) {
   return function(p1__4441_SHARP_) {
     return x + p1__4441_SHARP_
   }
 };
+tetris.core.direction = function direction(code) {
+  if(code === 39) {
+    return 1
+  }else {
+    if(code === 37) {
+      return-1
+    }else {
+      return null
+    }
+  }
+};
+tetris.core.ticks = tailrecursion.javelin.cell.call(null, 0);
+tetris.core.block_x = tailrecursion.javelin.cell.call(null, 0);
+tetris.core.block_y = tailrecursion.javelin.cell.call(null, 0);
+tetris.core.block = tailrecursion.javelin.lift.call(null, function(G__4443, G__4442) {
+  return cljs.core.PersistentArrayMap.fromArray(["\ufdd0:x", G__4442, "\ufdd0:y", G__4443], true)
+}).call(null, tetris.core.block_y, tetris.core.block_x);
+tetris.core.before = tailrecursion.javelin.cell.call(null, cljs.core.PersistentArrayMap.fromArray(["\ufdd0:x", 0, "\ufdd0:y", -1], true));
 tetris.core.redraw_BANG_ = function redraw_BANG_(element, color) {
   var col = cljs.core.get.call(null, element, "\ufdd0:x");
   var row = cljs.core.get.call(null, element, "\ufdd0:y");
-  var before = domina.css.sel.call(null, domina.css.sel.call(null, [cljs.core.str("div.line:nth-child("), cljs.core.str(row), cljs.core.str(")")].join("")), [cljs.core.str("div.cell:nth-child("), cljs.core.str(col + 1), cljs.core.str(")")].join(""));
   var el = domina.css.sel.call(null, domina.css.sel.call(null, [cljs.core.str("div.line:nth-child("), cljs.core.str(row + 1), cljs.core.str(")")].join("")), [cljs.core.str("div.cell:nth-child("), cljs.core.str(col + 1), cljs.core.str(")")].join(""));
-  domina.set_styles_BANG_.call(null, before, cljs.core.PersistentArrayMap.fromArray(["\ufdd0:background-color", "#eee"], true));
   return domina.set_styles_BANG_.call(null, el, cljs.core.PersistentArrayMap.fromArray(["\ufdd0:background-color", color], true))
+};
+tetris.core.always_BANG_ = function always_BANG_(obj) {
+  var o = obj.state;
+  var x = cljs.core.get.call(null, o, "\ufdd0:x");
+  var y = cljs.core.get.call(null, o, "\ufdd0:y");
+  var res = cljs.core.PersistentArrayMap.fromArray(["\ufdd0:x", x, "\ufdd0:y", y], true);
+  return function() {
+    return res
+  }
 };
 tetris.core.start = function start(width, height) {
   tetris.core.gen_BANG_.call(null, height, function() {
@@ -35068,22 +35091,47 @@ tetris.core.start = function start(width, height) {
   });
   tetris.core.lines = tailrecursion.javelin.cell.call(null, cljs.core.PersistentVector.EMPTY);
   tetris.core.board = tailrecursion.javelin.cell.call(null, cljs.core.PersistentVector.fromArray([tetris.core.lines], true));
-  tetris.core.block_x = tailrecursion.javelin.cell.call(null, 0);
-  tetris.core.block_y = tailrecursion.javelin.cell.call(null, 0);
-  tetris.core.block = tailrecursion.javelin.lift.call(null, function(G__4449, G__4448) {
-    return cljs.core.PersistentArrayMap.fromArray(["\ufdd0:x", G__4448, "\ufdd0:y", G__4449], true)
-  }).call(null, tetris.core.block_y, tetris.core.block_x);
+  tetris.core.allowed_QMARK_ = function allowed_QMARK_(direction) {
+    var newx = direction + tetris.core.block_x.state;
+    if(function() {
+      var and__3941__auto__ = newx >= 0;
+      if(and__3941__auto__) {
+        return newx < width
+      }else {
+        return and__3941__auto__
+      }
+    }()) {
+      return direction
+    }else {
+      return false
+    }
+  };
+  tetris.core.move_BANG_ = function move_BANG_(obj) {
+    var code = obj.keyCode;
+    if(cljs.core.truth_(tetris.core.move_QMARK_.call(null, code))) {
+      cljs.core.swap_BANG_.call(null, tetris.core.before, tetris.core.always_BANG_.call(null, tetris.core.block));
+      cljs.core.swap_BANG_.call(null, tetris.core.block_x, tetris.core.add.call(null, tetris.core.allowed_QMARK_.call(null, tetris.core.direction.call(null, code))));
+      return null
+    }else {
+      return null
+    }
+  };
   setInterval(function() {
+    cljs.core.swap_BANG_.call(null, tetris.core.before, tetris.core.always_BANG_.call(null, tetris.core.block));
     cljs.core.swap_BANG_.call(null, tetris.core.ticks, tetris.core.add.call(null, 1E3));
     return cljs.core.swap_BANG_.call(null, tetris.core.block_y, cljs.core.inc)
   }, 1E3);
+  document.addEventListener("keydown", tetris.core.move_BANG_);
   tailrecursion.javelin.lift.call(null, function(G__4451, G__4450) {
     return function() {
       return G__4450.log(G__4451)
     }.call(null)
   }).call(null, tetris.core.ticks, console);
-  return tailrecursion.javelin.lift.call(null, function(G__4452, G__4453) {
-    return G__4452.call(null, G__4453, "#666")
+  tailrecursion.javelin.lift.call(null, function(G__4453, G__4452) {
+    return G__4452.call(null, G__4453, "#eee")
+  }).call(null, tetris.core.before, tetris.core.redraw_BANG_);
+  return tailrecursion.javelin.lift.call(null, function(G__4454, G__4455) {
+    return G__4454.call(null, G__4455, "#666")
   }).call(null, tetris.core.redraw_BANG_, tetris.core.block)
 };
 goog.exportSymbol("tetris.core.start", tetris.core.start);
