@@ -94,8 +94,27 @@
 					a
 					b)) (first obj) obj))
 
-(defn drown?[m obj]
-	(if (< (get (get-max-cmp obj > :y) :y) m) true false))
+(defn indexOf? [v value cmp]
+	(if (> (count (filter #(cmp % value) v)) 0) true false))
+
+(defn compractor[o n]
+	(if 
+		(and 
+			(== (get o :x) (get n :x))
+			(== (get o :y) (get n :y)))
+		true false))
+
+(defn filled?[board eb]
+	(let [results (filter (fn[block] (if (indexOf? block {:x (get eb :x)  :y (inc (get eb :y))} compractor) true false )) board)]
+		(if (> (count results) 0) true false)))
+		
+(defn drown?[board obj maxh]
+	(let [eb (get-max-cmp obj > :y),
+				filed (filled? (.-state board) eb)]
+	
+	(if (and
+				(not filed)
+				(< (get (get-max-cmp obj > :y) :y) maxh)) true false)))
 
 (defn fall![obj]
 	(mapv #(let [y (inc (get % :y))] {:x (get % :x) :y y}) obj))
@@ -140,11 +159,11 @@
 	
 	; Задаем такты	
 	(js/setInterval #(do
-		(if (drown? (dec height) (.-state block))
+		(if (drown? board (.-state block) (dec height))
 			(swap! block fall!)
 			(do
 				(swap!  board (conjT (.-state block)))
-				(reset! block (.-state (new-object width height)))))) 600)
+				(reset! block (.-state (new-object width height)))))) 200)
 	
 	; Задаем прослушку 
 	(.addEventListener js/document "keydown" move!)
