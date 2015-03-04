@@ -19,6 +19,10 @@
                    [dommy.macros :refer [node]]))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Глобальные
+(def objectmap utils/object-map)
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Служебные функции
 
 ; вызывает fn count раз
@@ -34,7 +38,8 @@
   (or (== code 37) (== code 39)))
 
 ; Направление движения
-(defn get-direction![code]( if (== code 39) 1 (if (== code 37) -1 nil)))
+(defn get-direction![code]
+	(if (== code 39) 1 (if (== code 37) -1 nil)))
 
 ; Замыкающая функция суммирования джвух аргументов
 (defn add[x] #(+ x %))
@@ -46,54 +51,17 @@
 				y (get o :y)
 				res {:x x :y y}] res) obj)] (fn[] result)))
 
-
-
-;(def ticks (cell 0)) ; ячейка тактов
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; создаем объект
-(def objectmap [
-	[{:x 0 :y 0}] ; dot
-	[{:x 0 :y -1} {:x 0 :y 0}] ; two-dot
-	[{:x 0 :y -3} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0}] ; stick
-	[{:x 0 :y 0} {:x 0 :y -1} {:x -1 :y 0} {:x -1 :y -1}] ; square
-	[{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure								 
-	[{:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; L-figure
-	[{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure							 
-])
-
-(defn to-cell![blocks]
-	(cell blocks))
-
-; Создает новый объект на основе заданной ширины и высоты поля
-(defn new-object[w h]
-	(let [center (dec (Math/ceil (/ w 2))) 
-				obj (nth objectmap (dec (Math/ceil (* 7 (Math/random)))))] 
-		(to-cell! 
-			(mapv #(let [x (get % :x)] {:x (+ x center) :y (get % :y)}) obj))))
-	
-(defn redraw![block color]
-	(mapv 
-		#(let [col (get % :x)
-					 row (get % :y)
-					 el (->
-								(sel (str "div.line:nth-child(" (inc row) ")"))
-								(sel (str "div.cell:nth-child(" (inc col) ")")))]
-			(set-styles! el {:background-color color})) block))
-
-(defn redraw-full[board fictive]
-	(set-styles! (sel "div.cell") {:background-color "#eee"})
-	(mapv #(redraw! % "#666") board))
-
-
-(defn get-max-cmp[obj cmp keycode]
+; достает экстремальный по функции cmp ключ (key-word) из объекта obj
+(defn get-extremal[obj cmp key-word]
 	(reduce
 		(fn[a b] 
 			(if (cmp 
-						(get a keycode ) 
-						(get b keycode ))
+						(get a key-word ) 
+						(get b key-word ))
 					a
 					b)) (first obj) obj))
 
+; есть ли в векторе v значение value (значения сравниваются с помощью функции cmp)
 (defn indexOf? [v value cmp]
 	(if (> (count (filter #(cmp % value) v)) 0) true false))
 
@@ -104,24 +72,47 @@
 			(== (get o :y) (get n :y)))
 		true false))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Логика создания ячейки-объекта
+
+; Создает новый объект на основе заданной ширины и высоты поля
+(defn new-object[w h]
+	(let [center (dec (Math/ceil (/ w 2))) 
+				obj (nth objectmap (dec (Math/ceil (* 7 (Math/random)))))] 
+		(cell (mapv #(let [x (get % :x)] {:x (+ x center) :y (get % :y)}) obj))))
+	
+	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Рисование
+
+; Рисует объект block цвета color
+(defn redraw![block color]
+	(mapv 
+		#(let [col (get % :x)
+					 row (get % :y)
+					 el (->
+								(sel (str "div.line:nth-child(" (inc row) ")"))
+								(sel (str "div.cell:nth-child(" (inc col) ")")))]
+			(set-styles! el {:background-color color})) block))
+
+; Перерисовывает поле board (fictive остался для создания формулы, не знаю как избавиться)
+(defn redraw-full[board fictive]
+	(set-styles! (sel "div.cell") {:background-color "#eee"})
+	(mapv #(redraw! % "#666") board))
+
 (defn filled?[board eb]
 	(let [results (filter (fn[block] (if (indexOf? block {:x (get eb :x)  :y (inc (get eb :y))} compractor) true false )) board)]
 		(if (> (count results) 0) true false)))
 		
 (defn drown?[board obj maxh]
-	(let [eb (get-max-cmp obj > :y),
-				filed (filled? (.-state board) eb)]
-	
-	(if (and
-				(not filed)
-				(< (get (get-max-cmp obj > :y) :y) maxh)) true false)))
+	(let [eb (get-extremal obj > :y),
+				is-empty (not (filled? (.-state board) eb))]
+		(if (and is-empty (< (get (get-extremal obj > :y) :y) maxh)) true false)))
 
 (defn fall![obj]
 	(mapv #(let [y (inc (get % :y))] {:x (get % :x) :y y}) obj))
 
 (defn allowed?[direction block gmax]
-		(let [maxx (get (get-max-cmp block > :x) :x),
-					minx (get (get-max-cmp block < :x) :x),
+		(let [maxx (get (get-extremal block > :x) :x),
+					minx (get (get-extremal block < :x) :x),
 					nmaxx (+ direction maxx),
 					nminx (+ direction minx)]
 			
@@ -167,11 +158,7 @@
 	
 	; Задаем прослушку 
 	(.addEventListener js/document "keydown" move!)
-	
-	; логируем такты
-	(cell= (#(.log js/console ticks)))
-	
-	
+		
 	(cell= (redraw-full board block))
 	(cell= (redraw! block "#666")))
 	

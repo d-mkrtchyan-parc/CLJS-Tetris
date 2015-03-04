@@ -4,31 +4,12 @@
             [goog.history.Html5History :as history5])
   (:use [domina :only [add-class! remove-class!]]))
 
-(defn toggle-class! [node class pred]
-  (if pred
-    (add-class! node class)
-    (remove-class! node class)))
-
-(extend-type goog.History
-  event/EventType
-  (event-types [this]
-    (into {}
-          (map
-           (fn [[k v]]
-             [(keyword (. k (toLowerCase)))
-              v])
-           (js->clj goog.history.EventType)))))
-
-(defn history
-  [callback]
-  (let [h (if (history5/isSupported)
-            (goog.history.Html5History.)
-            (goog.History.))]
-    (do (event/listen h "navigate"
-                      (fn [e]
-                        (callback {:token (keyword (.-token e))
-                                   :type (.-type e)
-                                   :navigation? (.-isNavigation e)})))
-        (.setEnabled h true)
-        h)))
-
+(def object-map [
+	[{:x 0 :y 0}] ; dot
+	[{:x 0 :y -1} {:x 0 :y 0}] ; two-dot
+	[{:x 0 :y -3} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0}] ; stick
+	[{:x 0 :y 0} {:x 0 :y -1} {:x -1 :y 0} {:x -1 :y -1}] ; square
+	[{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure								 
+	[{:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; L-figure
+	[{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure							 
+])
