@@ -18,6 +18,9 @@
   (:require-macros [tailrecursion.javelin :refer [defc defc= cell=]]
                    [dommy.macros :refer [node]]))
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Служебные функции
+
 ; вызывает fn count раз
 (defn gen![count fn]
 	(if (> count 0) 
@@ -26,7 +29,7 @@
 			(gen! (dec count) fn)) 
 		nil))
 
-; Предикат на проверку движения влево впрааво
+; Предикат на проверку движения влево впрааво по keyCode ивента
 (defn move? [code]
   (or (== code 37) (== code 39)))
 
@@ -44,46 +47,19 @@
 				res {:x x :y y}] res) obj)] (fn[] result)))
 
 
-; ячейки
-(def ticks (cell 0))
-;(def block-x (cell 0))
-;(def block-y (cell 0))
-;(def block (cell= {:x block-x :y block-y}))
-;(def before (cell {:x 0 :y -1}))
+
+(def ticks (cell 0)) ; ячейка тактов
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; создаем объект
 (def objectmap [
-	[{:x 0 :y 0}]
-
-	;two-dot
-	[
-		{:x 0 :y -1}
-		{:x 0 :y 0}
-	]
-
-	;stick
-	[
-		{:x 0 :y -3}
-		{:x 0 :y -2}
-		{:x 0 :y -1}
-		{:x 0 :y 0}
-	]
-
-	;square
-	[
-		{:x 0 :y 0}
-		{:x 0 :y -1}
-		{:x -1 :y 0}
-		{:x -1 :y -1}
-	]
-
-	;L 
-	[
-		{:x 0 :y -2}
-		{:x 0 :y -1}
-		{:x 0 :y 0}
-		{:x 1 :y 0}
-	]])
+	[{:x 0 :y 0}] ; dot
+	[{:x 0 :y -1} {:x 0 :y 0}] ; two-dot
+	[{:x 0 :y -3} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0}] ; stick
+	[{:x 0 :y 0} {:x 0 :y -1} {:x -1 :y 0} {:x -1 :y -1}] ; square
+  [{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure								 
+	[{:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; L-figure
+	[{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure							 
+])
 
 (defn to-cell![blocks]
 	(cell blocks))
@@ -91,7 +67,7 @@
 ; Создает новый объект на основе заданной ширины и высоты поля
 (defn new-object[w h]
 	(let [center (dec (Math/ceil (/ w 2))) 
-				obj (nth objectmap (dec (Math/ceil (* 5 (Math/random)))))] 
+				obj (nth objectmap (dec (Math/ceil (* 7 (Math/random)))))] 
 		(to-cell! 
 			(mapv #(let [x (get % :x)] {:x (+ x center) :y (get % :y)}) obj))))
 
@@ -111,6 +87,25 @@
 			(set-styles! el {:background-color color})) block))
 
 
+(defn get-max-cmp[obj cmp]
+	(reduce
+		(fn[a b] 
+			(if (cmp 
+						(get a :x ) 
+						(get b :x ))
+					a
+					b)) (first obj) obj))
+
+
+(defn allowed?[direction block gmax]
+		(let [maxx (get (get-max-cmp block >) :x),
+					minx (get (get-max-cmp block <) :x),
+					nmaxx (+ direction maxx),
+					nminx (+ direction minx)]
+			
+			(if (and (>= nminx 0) (< nmaxx gmax)) direction false )))
+
+
 ; То что происходит по onload body
 (defn ^:export start [width height]
 
@@ -123,13 +118,7 @@
 	(defc board [lines])
 	
 	(def block (new-object width height))
-	
-	; TODO надо поправить allowed?
-	(defn allowed?[direction] direction)
-;		#_(let [maxx (get-max-x block)  ;TODO сделать get-max
-;					minx (get-min-x block) :TODO get-max
-;			(if (and (>= newx 0) (< newx width)) direction false )))
-;	
+		
 	(defn move-to! [dir]
 		(fn[item]
 			(mapv #(let [x (+ dir (get % :x))] {:x x :y (get % :y)}) item)))
@@ -139,11 +128,8 @@
 		(let [code (.-keyCode obj),
 					direction (if (move? code) (get-direction! code) false)]
 			
-			(if (allowed? direction)
-				
-				; вот здесь процесс изменения ячейки, который надо будет переписать, когда ячейки станут компаундными
-				(do
-					(swap! block (move-to! direction))) nil)))
+			(if (allowed? direction (.-state block) width)
+					(swap! block (move-to! direction)) nil)))
 	
 	
 	;;;;;;;;;;;;;;;;;;;;;;; side effects	
