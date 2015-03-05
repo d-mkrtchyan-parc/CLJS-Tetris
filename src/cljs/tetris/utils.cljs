@@ -1,15 +1,25 @@
-(ns tetris.utils
-  (:require [clojure.browser.event :as event]
-            [goog.History :as history]
-            [goog.history.Html5History :as history5])
-  (:use [domina :only [add-class! remove-class!]]))
+(ns tetris.utils)
 
 (def object-map [
 	[{:x 0 :y 0}] ; dot
 	[{:x 0 :y -1} {:x 0 :y 0}] ; two-dot
 	[{:x 0 :y -3} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0}] ; stick
 	[{:x 0 :y 0} {:x 0 :y -1} {:x -1 :y 0} {:x -1 :y -1}] ; square
-	[{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure								 
+	[{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure
 	[{:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; L-figure
-	[{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure							 
+	[{:x -1 :y -1} {:x 1 :y -1} {:x -1 :y 0} {:x 0 :y 0} {:x 1 :y 0}] ; П-figure
+	[{:x -1 :y -1} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; z-swipe-figure
+	[{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure
 ])
+
+; возвращает случайный цвет в hex
+(defn random-color[]
+	(str "#" (.toString (Math/round (* (Math/random) 0xFFFFFF)) 16)))
+
+; вызывает fn count раз
+(defn repeat![c f]
+	(if 
+		(> c 0)  		
+		(do (f c)
+				(recur (dec c) f))
+		nil))

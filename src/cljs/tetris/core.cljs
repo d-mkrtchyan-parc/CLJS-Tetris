@@ -1,44 +1,36 @@
 ; Объявлем неймспейс tetris.core
 (ns tetris.core
+	
 	; описываем все зависимости
-  (:require [clojure.browser.event :as event]
-            [clojure.string :as string]
-            [tailrecursion.javelin :refer [cell]]
-            [tetris.utils :as utils]
-            [dommy.core :as dommy])
-	
+	(:require [clojure.browser.event :as event]
+						[clojure.string :as string]
+						[tailrecursion.javelin :refer [cell]]
+						[tetris.utils :as utils]
+						[dommy.core :as dommy])
+
 	; и способы их применения
-  (:use [cljs.reader :only [read-string]]
-        [domina :only [add-class! by-id remove-class! set-text! set-styles! set-html! swap-content! single-node append!]]
-        [domina.css :only [sel]]
-        [domina.events :only [capture! listen!]]
-        [domina.xpath :only [xpath]])
-	
+	(:use [cljs.reader :only [read-string]]
+				[domina :only [add-class! by-id remove-class! set-text! set-styles! set-html! swap-content! single-node append!]]
+				[domina.css :only [sel]]
+				[domina.events :only [capture! listen!]]
+				[domina.xpath :only [xpath]])
+
 	; и макросы из библиотек
-  (:require-macros [tailrecursion.javelin :refer [defc defc= cell=]]
-                   [dommy.macros :refer [node]]))
+	(:require-macros 	[tailrecursion.javelin :refer [defc defc= cell=]]
+										[dommy.macros :refer [node]]))
 
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Глобальные
-(def objectmap utils/object-map)
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Глобальные переменные
+(def objectmap utils/object-map ) ; вектор возможных объектов
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Служебные функции
 
-; вызывает fn count раз
-(defn gen![count fn]
-	(if (> count 0) 
-		(do
-			(fn count)
-			(gen! (dec count) fn)) 
-		nil))
 
-; Предикат на проверку движения влево впрааво по keyCode ивента
+; Предикат на проверку движения влево/вправо по keyCode ивента
 (defn move? [code]
-  (or (== code 37) (== code 39)))
+	(or (== code 37) (== code 39)))
 
-; Направление движения
-(defn get-direction![code]
+; Принимает keyCode возвращает направление движения по оси X
+(defn get-direction[code]
 	(if (== code 39) 1 (if (== code 37) -1 nil)))
 
 ; Замыкающая функция суммирования джвух аргументов
@@ -46,10 +38,8 @@
 
 ; всегда возвращает obj ячейку в деструктурированном виде
 (defn always![obj]
-	(let [result (mapv #(let [o (.-state %)
-				x (get o :x)
-				y (get o :y)
-				res {:x x :y y}] res) obj)] (fn[] result)))
+	(let [	result (mapv #(let [o (.-state %) 
+			res {:x (:x o) :y (:y o)}] res) obj)] (fn[] result)))
 
 ; достает экстремальный по функции cmp ключ (key-word) из объекта obj
 (defn get-extremal[obj cmp key-word]
@@ -59,106 +49,157 @@
 						(get a key-word ) 
 						(get b key-word ))
 					a
-					b)) (first obj) obj))
+					b)) 
+		(first obj) obj))
 
 ; есть ли в векторе v значение value (значения сравниваются с помощью функции cmp)
 (defn indexOf? [v value cmp]
-	(if (> (count (filter #(cmp % value) v)) 0) true false))
+	(> (count (filter #(cmp % value) v)) 0))
 
+; компрактор двух объектов по ключевым словам x и y
 (defn compractor[o n]
-	(if 
-		(and 
-			(== (get o :x) (get n :x))
-			(== (get o :y) (get n :y)))
-		true false))
+	(and 
+		(== (:x o) (:x n))
+		(== (:y o) (:y n))))
+			
+; принимает параметр dir (направление) и возвращает функцию :: Item -> Item
+(defn move-to! [dir]
+	(fn[block]
+		(let [	color (:color block)
+				blocks (:blocks block)]
+			{:color color :blocks (mapv #(let [x (+ dir (:x %))] {:x x :y (:y %)}) blocks) })))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Логика создания ячейки-объекта
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Создает новый объект на основе заданной ширины и высоты поля
-(defn new-object[w h]
-	(let [center (dec (Math/ceil (/ w 2))) 
-				obj (nth objectmap (dec (Math/ceil (* 7 (Math/random)))))] 
-		(cell (mapv #(let [x (get % :x)] {:x (+ x center) :y (get % :y)}) obj))))
-	
-	
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Рисование
+(defn new-object[w h color]
+	(let [	center (dec (Math/ceil (/ w 2))) ; вычисляем центр поля
+			number-in-map (dec (Math/ceil (* (count objectmap) (Math/random)))) ; генерим случайнй номер
+			object (nth objectmap number-in-map) ; и достаем объект из карты объектов с этим номером
+			blocks-vector (mapv #(let [x (:x %)] {:x (+ x center) :y (:y %)}) object)] ; создаем массив блоков 
+		
+		; создаем cell с ключами color и blocks
+		(cell {:color color :blocks blocks-vector })))
 
+; создает новый полноценный объект
+(defn create![w h]
+	(new-object w h (utils/random-color)))
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Рисование
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Рисует объект block цвета color
-(defn redraw![block color]
-	(mapv 
-		#(let [col (get % :x)
-					 row (get % :y)
-					 el (->
-								(sel (str "div.line:nth-child(" (inc row) ")"))
-								(sel (str "div.cell:nth-child(" (inc col) ")")))]
-			(set-styles! el {:background-color color})) block))
+(defn redraw![block]
+	(let [{color :color blocks :blocks} block]
+		(mapv 
+			#(let [	col (:x %)
+							row (:y %)
+							el (->
+									(sel (str "#game div.line:nth-child(" (inc row) ")"))
+									(sel (str "div.cell:nth-child(" (inc col) ")")))]
+				(set-styles! el {:background-color color })) blocks)))
 
 ; Перерисовывает поле board (fictive остался для создания формулы, не знаю как избавиться)
 (defn redraw-full[board fictive]
 	(set-styles! (sel "div.cell") {:background-color "#eee"})
-	(mapv #(redraw! % "#666") board))
+	(mapv #(redraw! %) (:context board)))
 
-(defn filled?[board eb]
-	(let [results (filter (fn[block] (if (indexOf? block {:x (get eb :x)  :y (inc (get eb :y))} compractor) true false )) board)]
-		(if (> (count results) 0) true false)))
-		
-(defn drown?[board obj maxh]
-	(let [eb (get-extremal obj > :y),
-				is-empty (not (filled? (.-state board) eb))]
-		(if (and is-empty (< (get (get-extremal obj > :y) :y) maxh)) true false)))
 
-(defn fall![obj]
-	(mapv #(let [y (inc (get % :y))] {:x (get % :x) :y y}) obj))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Игровая логика в алгоритмах
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Предикат [Map -> Map] -> Boolean
+; Возвращает true если в @board поле @eb [Map {x y}] не заполнено
+(defn filled?[blocks eb]
+	(let [results (filter (fn[block] (indexOf? (:blocks block) {:x (:x eb) :y (inc (:y eb))} compractor)) blocks)]
+		(> (count results) 0)))
+
+
+; предикат [Map -> Map] -> Boolean возвращет true если block некуда двигаться в board
+; TODO ; FIX ; на данный момент только по оси Y
+(defn stacked? [board blocks]
+	(let [	eb (get-extremal blocks > :y) ; экстремальный блок по оси Y ; TODO FIX надо будет сделать так, чтобы это было множество
+			fields (.-state board) ; поля в board
+			is-place-to-fall (< (:y eb) (dec (:height fields))) ; есть ли куда падать
+			is-place-filled (filled? (:context fields) eb)] ; пустой ли в board блок eb
+		(or is-place-filled (not is-place-to-fall)))) ; результат: если нет места куда падать и место забито  
+
+; принимает блок и выдает такой же блок со смещенной на 1 вниз координатой Y
+(defn fall![block]
+	(let [ 	{color :color blocks :blocks} block
+			swapped (mapv #(let [y (inc (:y %))] {:x (:x %) :y y}) blocks)]
+		{:color color :blocks swapped }))
+
+; предикат возвращает true, если блок можно перемещать в направлении direction
 (defn allowed?[direction block gmax]
-		(let [maxx (get (get-extremal block > :x) :x),
-					minx (get (get-extremal block < :x) :x),
-					nmaxx (+ direction maxx),
-					nminx (+ direction minx)]
-			
-			(if (and (>= nminx 0) (< nmaxx gmax)) direction false )))
+	(let [	maxx (get (get-extremal block > :x) :x)
+			minx (get (get-extremal block < :x) :x)
+			nmaxx (+ direction maxx)
+			nminx (+ direction minx)]
+		(if (and (>= nminx 0) (< nmaxx gmax)) direction false )))
+
+; принимает блок и возвращает обработчки который засовывает в аргумент @board исходный блок
+(defn conj-add[block]
+	(let [	st (.-state block)
+			object-blocks {:color (:color st) :blocks (:blocks st)}]
+		
+		(fn[board]
+			(let [	{blocks :context width :width height :height}  board
+					res {:width width :height height :context (conj blocks object-blocks)}]
+ 				res ))))
 
 
-(defn conjT[o] #(conj % o))
+; Перемещает объект
+(defn move![event block board]
+	(let [	code (.-keyCode event)
+			blocks (:blocks @block)
+			width (:width @board)
+			direction (if (move? code) (get-direction code) false)]
+
+		(if (and direction (allowed? direction blocks width))
+			(swap! block (move-to! direction)) nil)))
+
 
 ; То что происходит по onload body
 (defn ^:export start [width height]
 
-	; рисуем поле
-	(gen! height #(append! (sel "#game") "<div class='line'></div>"))
-	(gen! width #(append! (sel ".line") "<div class='cell'></div>"))
+	; рисуем игровое поле
+	(utils/repeat! height #(append! (sel "#game") "<div class='line'></div>"))
+	(utils/repeat! width #(append! (sel ".line") "<div class='cell'></div>"))
+
+	; рисуем область NEXT
+	(utils/repeat! 5 #(append! (sel "#next") "<div class='line'></div>"))
+	(utils/repeat! 5 #(append! (sel "#next .line") "<div class='cell next'></div>"))
+
+	; модель поля ;FUTURE  переделать так, чтобы не пользоваться больше w h в коде
 	
-	; модель поля
-	(defc board [])
+	(defc board {:context [] :width width :height height })
+	(def block (create! width height))
+
 	
-	(def block (new-object width height))
-		
-	(defn move-to! [dir]
-		(fn[item]
-			(mapv #(let [x (+ dir (get % :x))] {:x x :y (get % :y)}) item)))
-	
-	; Перемещает объект
-	(defn move![obj]
-		(let [code (.-keyCode obj),
-					direction (if (move? code) (get-direction! code) false)]
-			
-			(if (allowed? direction (.-state block) width)
-					(swap! block (move-to! direction)) nil)))
-	
-	
-	;;;;;;;;;;;;;;;;;;;;;;; side effects	
-	
-	; Задаем такты	
-	(js/setInterval #(do
-		(if (drown? board (.-state block) (dec height))
-			(swap! block fall!)
-			(do
-				(swap!  board (conjT (.-state block)))
-				(reset! block (.-state (new-object width height)))))) 200)
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Минимум логики
 	
 	; Задаем прослушку 
-	(.addEventListener js/document "keydown" move!)
-		
-	(cell= (redraw-full board block))
-	(cell= (redraw! block "#666")))
+	(.addEventListener js/document "keydown" #(move! % block board))
+
+	(defn step![]
+		(if (stacked? board (:blocks (.-state block))) ; если объекту некуда двигаться, то 
+				(do 
+					(swap! board (conj-add block)) ; втыкаем в board текущий блок
+					(reset! block (.-state (create! (:width (.-state board)) (:height (.-state board)))))) ; обновляем текущий block на новый созданный
+				;иначе
+				(swap! block fall!)))
+
+	;;;;;;;;;;;;;;;;;;;;;;; side effects	
+
+	; Задаем такты	
+	(js/setInterval step! 200)
+
 	
+
+	 	(cell= (redraw-full board block))
+		(cell= (redraw! block)))

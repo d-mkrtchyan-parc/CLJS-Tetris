@@ -20,6 +20,10 @@
 	background: #eee;
 }
 
+.next{
+	background: red;
+}
+
 .block {
 	background: #666;
 }
