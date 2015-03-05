@@ -1,0 +1,41 @@
+.center{
+	text-align: center;
+}
+
+#game{
+	padding: 10px;
+}
+
+.line{
+	display: block;
+	height: 16px;
+}
+
+.cell {
+	display: inline-block;
+	width: 15px;
+	height: 15px;
+	margin-right: 1px;
+	margin-bottom: 1px;
+	background: #eee;
+}
+
+.next{
+	background: red;
+}
+
+.block {
+	background: #666;
+}
+
+.loosed{
+	vertical-align: middle;
+	text-align: center;
+	display: table-cell;
+	border: solid red 10px;
+}
+
+.loose button{
+
+}
+
