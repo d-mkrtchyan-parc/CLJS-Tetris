@@ -147,16 +147,19 @@
           nminx (+ direction minx)]
     (if (and (>= nminx 0) (< nmaxx gmax)) direction false )))
 
+(defn toggle![x](not x))
+
 ; принимает блок и возвращает обработчки который засовывает в аргумент @board исходный блок
 (defn conj-add[block]
   (let [  st (.-state block)
-          object-blocks {:color (:color st) :blocks (:blocks st)}]
+          blocks-struct  (:blocks st)
+          object-blocks {:color (:color st) :blocks blocks-struct}]
 
     (fn[board]
       (let [  {blocks :context width :width height :height}  board
-              res {:width width :height height :context (conj blocks object-blocks)}]
-        res ))))
-
+              new-board (conj blocks object-blocks)
+              res {:width width :height height :context new-board}
+        ]res))))
 
 ; Перемещает объект
 (defn move![event block board]
@@ -183,11 +186,12 @@
 
   ; модель поля ;FUTURE  переделать так, чтобы не пользоваться больше w h в коде
 
-  (defc board {:context [] :width width :height height })
+  (defc board {:context [] :width width :height height})
+  (defc overloaded false)
   (def block (create! width height))
 
-
-  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Минимум логики
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Логика вычислений и побочные действия
 
   ; Задаем прослушку 
   (.addEventListener js/document "keydown" #(move! % block board))
@@ -195,6 +199,9 @@
   (defn step![]
     (if (stacked? board (:blocks (.-state block))) ; если объекту некуда двигаться, то 
       (do 
+        (if (> (count (filter #(neg? (:y %)) (:blocks @block)))0) 
+            (swap! overloaded toggle!)
+            nil)
         (swap! board (conj-add block)) ; втыкаем в board текущий блок
         (reset! block (.-state (create! (:width (.-state board)) (:height (.-state board)))))) ; обновляем текущий block на новый созданный
       ;иначе
@@ -203,9 +210,15 @@
   ;;;;;;;;;;;;;;;;;;;;;;; side effects	
 
   ; Задаем такты	
-  (js/setInterval step! 200)
+  (def ticks (js/setInterval step! 200))
+  
+  (defn loose![over]
+    (if over 
+      (do 
+        (set-html! (sel "#game") "You looooooooose!")
+        (js/clearInterval ticks))  nil))
 
-
-
+  (cell= (loose! overloaded))
   (cell= (redraw-full board block))
   (cell= (redraw! block)))
+  
