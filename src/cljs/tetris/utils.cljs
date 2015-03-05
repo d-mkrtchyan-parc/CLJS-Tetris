@@ -12,9 +12,26 @@
   [{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure
 ])
 
+(def color-map [
+  "red"
+  "green"
+  "blue"
+  "yellow"
+  "cyan"
+  "navy"
+  "black"
+  "pink"
+  "orange"
+  "magenta"
+  ])
+
 ; возвращает случайный цвет в hex
+; (defn random-color[]
+;   (str "#" (.toString (Math/round (* (Math/random) 0xFFFFFF)) 16)))
+
 (defn random-color[]
-  (str "#" (.toString (Math/round (* (Math/random) 0xFFFFFF)) 16)))
+  (let [  color (nth color-map (Math/round (* (count color-map) (Math/random)))) 
+          _ (.log js/console color)] color)) 
 
 ; вызывает fn count раз
 (defn repeat![c f]
@@ -33,3 +50,7 @@
   (let [  result (mapv #(let [o (.-state %) 
           res {:x (:x o) :y (:y o)}] res) obj)] 
             (fn[] result)))
+
+; Предикат на проверку движения влево/вправо по keyCode ивента
+(defn arrow? [code]
+  (or (== code 37) (== code 39)))

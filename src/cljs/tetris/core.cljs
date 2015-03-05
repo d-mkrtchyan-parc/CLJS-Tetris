@@ -25,9 +25,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Служебные функции
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Предикат на проверку движения влево/вправо по keyCode ивента
-(defn move? [code]
-  (or (== code 37) (== code 39)))
 
 ; Принимает keyCode возвращает направление движения по оси X
 (defn get-direction[code]
@@ -117,7 +114,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Предикат [Map -> Map] -> Boolean
-; Возвращает true если в @board поле @eb [Map {x y}] не заполнено
+; Возвращает true если в @blocks поле @eb [Map {x y}] не заполнено
 (defn filled?[blocks eb]
   (let [results (filter (fn[block] (utils/indexOf? (:blocks block) {:x (:x eb) :y (inc (:y eb))} compractor)) blocks)]
     (> (count results) 0)))
@@ -140,12 +137,20 @@
     {:color color :blocks swapped }))
 
 ; предикат возвращает true, если блок можно перемещать в направлении direction
-(defn allowed?[direction block gmax]
+(defn allowed?[direction block board]
   (let [  maxx (get (get-extremal block > :x) :x)
+          maxes-x (get-extremals block :x)
           minx (get (get-extremal block < :x) :x)
           nmaxx (+ direction maxx)
+          gmax (:width @board)
+          filled-filter-fn #(filled? (:context @board) %)
+          mapped (mapv #(let [x (inc (:x %))] {:y (:y %) :x x}) maxes-x)
+          is-place-filled (> (count (filter filled-filter-fn mapped)  ) 0)
           nminx (+ direction minx)]
-    (if (and (>= nminx 0) (< nmaxx gmax)) direction false )))
+    (if (and 
+      (>= nminx 0) 
+      (< nmaxx gmax))
+      (not is-place-filled) direction false )))
 
 (defn toggle![x](not x))
 
@@ -166,9 +171,9 @@
   (let [  code (.-keyCode event)
           blocks (:blocks @block)
           width (:width @board)
-          direction (if (move? code) (get-direction code) false)]
+          direction (if (utils/arrow? code) (get-direction code) false)]
 
-    (if (and direction (allowed? direction blocks width))
+    (if (and direction (allowed? direction blocks board))
         (swap! block (move-to! direction)) 
         nil)))
 
@@ -184,11 +189,6 @@
     (set-styles! {:width "inherit" :height "inherit" }))
   (utils/repeat! height #(append! (sel "#game") "<div class='line'></div>"))
   (utils/repeat! width #(append! (sel ".line") "<div class='cell'></div>"))
-
-  ; рисуем область NEXT
-  ; (set-html! (sel "#next") "" ) ;чистим сначала
-  ; (utils/repeat! 5 #(append! (sel "#next") "<div class='line'></div>"))
-  ; (utils/repeat! 5 #(append! (sel "#next .line") "<div class='cell next'></div>"))
 
   ; модель поля ;FUTURE  переделать так, чтобы не пользоваться больше w h в коде
 
@@ -229,6 +229,9 @@
           "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
         (js/clearInterval ticks))  nil))
 
+  ; (defn analyze![board])
+
+  ; (cell= (analyze! board))
   (cell= (loose! overloaded))
   (cell= (redraw-full board block))
   (cell= (redraw! block)))
