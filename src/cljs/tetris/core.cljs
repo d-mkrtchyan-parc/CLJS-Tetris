@@ -177,12 +177,18 @@
 (defn ^:export start [width height]
 
   ; рисуем игровое поле
+  (->
+    (sel "#game") 
+    (remove-class! "loosed")
+    (set-html! "")
+    (set-styles! {:width "inherit" :height "inherit" }))
   (utils/repeat! height #(append! (sel "#game") "<div class='line'></div>"))
   (utils/repeat! width #(append! (sel ".line") "<div class='cell'></div>"))
 
   ; рисуем область NEXT
-  (utils/repeat! 5 #(append! (sel "#next") "<div class='line'></div>"))
-  (utils/repeat! 5 #(append! (sel "#next .line") "<div class='cell next'></div>"))
+  ; (set-html! (sel "#next") "" ) ;чистим сначала
+  ; (utils/repeat! 5 #(append! (sel "#next") "<div class='line'></div>"))
+  ; (utils/repeat! 5 #(append! (sel "#next .line") "<div class='cell next'></div>"))
 
   ; модель поля ;FUTURE  переделать так, чтобы не пользоваться больше w h в коде
 
@@ -211,11 +217,16 @@
 
   ; Задаем такты	
   (def ticks (js/setInterval step! 200))
-  
+
   (defn loose![over]
     (if over 
       (do 
-        (set-html! (sel "#game") "You looooooooose!")
+        (set-html! 
+          (->
+            (sel "#game") 
+            (add-class! "loosed")
+            (set-styles! {:width (str (* width 16) "px") :height (str (* height 16) "px")}) )
+          "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
         (js/clearInterval ticks))  nil))
 
   (cell= (loose! overloaded))

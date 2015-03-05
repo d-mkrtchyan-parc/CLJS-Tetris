@@ -27,3 +27,15 @@
 .block {
 	background: #666;
 }
+
+.loosed{
+	vertical-align: middle;
+	text-align: center;
+	display: table-cell;
+	border: solid red 10px;
+}
+
+.loose button{
+
+}
+
