@@ -57,18 +57,23 @@
     ; reduce object
     obj))
 
-; компрактор двух объектов по ключевым словам x и y
-(defn compractor[o n]
-  (and 
-    (== (:x o) (:x n))
-    (== (:y o) (:y n))))
-
 ; принимает параметр dir (направление) и возвращает функцию :: Item -> Item
-(defn move-to! [dir]
-  (fn[block]
-    (let [  color (:color block)
-            blocks (:blocks block)]
-      {:color color :blocks (mapv #(let [x (+ dir (:x %))] {:x x :y (:y %)}) blocks) })))
+(defn move-to![dir]
+  (fn[board]
+    (let [  block (:current board)
+            color (:color block)
+            blocks (:blocks block)
+            add-coords (fn[item] 
+              { :x (+ (:x dir) (:x item)) 
+                :y (+ (:y dir) (:y item)) 
+              })
+            newblock {:color color :blocks (mapv add-coords blocks)} ] 
+      { :current newblock
+        :context (:context board)
+        :width (:width board)
+        :height (:height board)
+        :overloaded (:overloaded board)
+      })))
 
 
 
@@ -83,13 +88,29 @@
           blocks-vector (mapv #(let [x (:x %)] {:x (+ x center) :y (:y %)}) object)] ; создаем массив блоков 
     
     ; создаем cell с ключами color и blocks
-    (cell {:color color :blocks blocks-vector })))
+    {:color color :blocks blocks-vector }))
 
 ; создает новый полноценный объект
 (defn create![w h]
   (new-object w h (utils/random-color)))
 
+; создает поле
+(defn create-board![w h]
+  (let [cols-init (fn[cols init y-iterator x-iterator]
+          (if (pos? cols) 
+              (recur (dec cols) (conj init {:x x-iterator :y y-iterator :filled false}) y-iterator (inc x-iterator))
+              init))
 
+        rows-init (fn[b height iterator]
+          (if (pos? height)
+              (recur (conj b (cols-init w [] iterator 0)) (dec height) (inc iterator))
+              b))]
+
+    { :current (create! w h)  
+      :context (rows-init [] h 0)
+      :overloaded false
+      :width w
+      :height h }))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Рисование
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -104,6 +125,18 @@
                 (sel (str "div.cell:nth-child(" (inc col) ")")))]
         (set-styles! el {:background-color color })) blocks)))
 
+(defn redraw-board![board]
+  (let [  ctx (:context board)
+          drawwer (fn[item](let [
+            {col :x row :y filled :filled color :color} item
+            el  (->
+                  (sel (str "#game div.line:nth-child(" (inc row) ")"))
+                  (sel (str "div.cell:nth-child(" (inc col) ")")))]
+            (set-styles! el {:background-color (if filled "#eee" color)})))]
+    (do
+      (mapv #(mapv drawwer %) ctx)
+      (redraw! (:current board)))))
+
 ; Перерисовывает поле board (fictive остался для создания формулы, не знаю как избавиться)
 (defn redraw-full[board fictive]
   (set-styles! (sel "div.cell") {:background-color "#eee"})
@@ -115,9 +148,16 @@
 
 ; Предикат [Map -> Map] -> Boolean
 ; Возвращает true если в @blocks поле @eb [Map {x y}] не заполнено
-(defn filled?[blocks eb]
-  (let [results (filter (fn[block] (utils/indexOf? (:blocks block) {:x (:x eb) :y (inc (:y eb))} compractor)) blocks)]
-    (> (count results) 0)))
+(defn filled?[block board]
+  (let [context (:context board)
+        {x :x y :y} block
+        is-block-filled? (some (fn[row] (some (fn[col](and (= block col) (:state col))) row)) context )
+        res (or (neg? x) 
+              (>= y (:height board)) 
+              (>= x (:width board))
+              is-block-filled? )]
+    res))
+
 
 
 ; предикат [Map -> Map] -> Boolean возвращет true если block некуда падать
@@ -136,21 +176,19 @@
           swapped (mapv #(let [y (inc (:y %))] {:x (:x %) :y y}) blocks)]
     {:color color :blocks swapped }))
 
+; Предикат, определяет можно ли переместить block в board на direction позиций по горизонтали
+(defn locked? [direction board]
+  (let [  block (:blocks (:current board))
+          context (:context board)
+          to-new-position #(let [nx (+ (:x direction) (:x %)) ny (+ (:y direction) (:y %))] {:x nx :y ny })
+          check-place (mapv to-new-position block)
+          filled-filter-fn #(filled? % board)]
+    (pos? (count (filter filled-filter-fn check-place)))))
+
 ; предикат возвращает true, если блок можно перемещать в направлении direction
-(defn allowed?[direction block board]
-  (let [  maxx (get (get-extremal block > :x) :x)
-          maxes-x (get-extremals block :x)
-          minx (get (get-extremal block < :x) :x)
-          nmaxx (+ direction maxx)
-          gmax (:width @board)
-          filled-filter-fn #(filled? (:context @board) %)
-          mapped (mapv #(let [x (inc (:x %))] {:y (:y %) :x x}) maxes-x)
-          is-place-filled (> (count (filter filled-filter-fn mapped)  ) 0)
-          nminx (+ direction minx)]
-    (if (and 
-      (>= nminx 0) 
-      (< nmaxx gmax))
-      (not is-place-filled) direction false )))
+(defn allowed?[direction board]
+  (let [locked (locked? direction board)]
+    (if (not locked) direction false )))
 
 (defn toggle![x](not x))
 
@@ -167,14 +205,13 @@
         ]res))))
 
 ; Перемещает объект
-(defn move![event block board]
+(defn move![event board]
   (let [  code (.-keyCode event)
-          blocks (:blocks @block)
-          width (:width @board)
-          direction (if (utils/arrow? code) (get-direction code) false)]
+          blocks (:blocks (:current @board))
+          direction (if (utils/arrow? code) (utils/code->direction code) false)]
 
-    (if (and direction (allowed? direction blocks board))
-        (swap! block (move-to! direction)) 
+    (if (and direction (allowed? direction @board))
+        (swap! board (move-to! direction)) 
         nil)))
 
 
@@ -192,47 +229,46 @@
 
   ; модель поля ;FUTURE  переделать так, чтобы не пользоваться больше w h в коде
 
-  (defc board {:context [] :width width :height height})
-  (defc overloaded false)
-  (def block (create! width height))
+  (defc board (create-board! width height))
+  ; (defc overloaded false)
+  ; (def block (create! width height))
 
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Логика вычислений и побочные действия
 
   ; Задаем прослушку 
-  (.addEventListener js/document "keydown" #(move! % block board))
+  (.addEventListener js/document "keydown" #(move! % board))
 
-  (defn step![]
-    (if (stacked? board (:blocks (.-state block))) ; если объекту некуда двигаться, то 
-      (do 
-        (if (> (count (filter #(neg? (:y %)) (:blocks @block)))0) 
-            (swap! overloaded toggle!)
-            nil)
-        (swap! board (conj-add block)) ; втыкаем в board текущий блок
-        (reset! block (.-state (create! (:width (.-state board)) (:height (.-state board)))))) ; обновляем текущий block на новый созданный
-      ;иначе
-      (swap! block fall!)))
+  ; (defn step![]
+  ;   (if (stacked? board (:blocks (.-state block))) ; если объекту некуда двигаться, то 
+  ;     (do 
+  ;       (if (> (count (filter #(neg? (:y %)) (:blocks @block)))0) 
+  ;           (swap! overloaded toggle!)
+  ;           nil)
+  ;       (swap! board (conj-add block)) ; втыкаем в board текущий блок
+  ;       (reset! block (.-state (create! (:width (.-state board)) (:height (.-state board)))))) ; обновляем текущий block на новый созданный
+  ;     ;иначе
+  ;     (swap! block fall!)))
 
   ;;;;;;;;;;;;;;;;;;;;;;; side effects	
 
   ; Задаем такты	
-  (def ticks (js/setInterval step! 200))
+  ;(def ticks (js/setInterval step! 600))
 
-  (defn loose![over]
-    (if over 
-      (do 
-        (set-html! 
-          (->
-            (sel "#game") 
-            (add-class! "loosed")
-            (set-styles! {:width (str (* width 16) "px") :height (str (* height 16) "px")}) )
-          "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
-        (js/clearInterval ticks))  nil))
+  ; (defn loose![over]
+  ;   (if over 
+  ;     (do 
+  ;       (set-html! 
+  ;         (->
+  ;           (sel "#game") 
+  ;           (add-class! "loosed")
+  ;           (set-styles! {:width (str (* width 16) "px") :height (str (* height 16) "px")}) )
+  ;         "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
+  ;       (js/clearInterval ticks))  nil))
 
   ; (defn analyze![board])
 
-  ; (cell= (analyze! board))
-  (cell= (loose! overloaded))
-  (cell= (redraw-full board block))
-  (cell= (redraw! block)))
+  ; (cell= (loose! overloaded))
+  ; (cell= (redraw-full board block))
+  (cell= (redraw-board! board)))
   

@@ -12,18 +12,11 @@
   [{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure
 ])
 
+; вектор доступных цветов
 (def color-map [
-  "red"
-  "green"
-  "blue"
-  "yellow"
-  "cyan"
-  "navy"
-  "black"
-  "pink"
-  "orange"
-  "magenta"
-  ])
+  "red" "green" "blue" "yellow"
+  "cyan" "navy" "black" "pink"
+  "orange" "magenta" ])
 
 ; возвращает случайный цвет в hex
 ; (defn random-color[]
@@ -53,4 +46,22 @@
 
 ; Предикат на проверку движения влево/вправо по keyCode ивента
 (defn arrow? [code]
-  (or (== code 37) (== code 39)))
+  (and (>= code 37) (<= code 40)))
+
+; компрактор двух объектов по ключевым словам x и y
+(defn o-cmp[o n]
+  (and 
+    (== (:x o) (:x n))
+    (== (:y o) (:y n))))
+
+; содержится ли объект block в blocks
+(defn contained? [block blocks]
+  (filter #() blocks)
+  )
+
+
+(defn code->direction[code]
+  (let [diag (pos? (mod code 2))
+        x (if diag (- code 38) 0)
+        y (if diag 0 (- code 39))]
+   {:x x :y y}))
