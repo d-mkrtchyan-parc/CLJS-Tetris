@@ -114,6 +114,15 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Рисование
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn loose![width height]
+  (do (set-html! 
+        (->
+          (sel "#game") 
+          (add-class! "loosed")
+          (set-styles! {:width (str (* width 16) "px") :height (str (* height 16) "px")}) )
+        "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
+      (js/clearInterval ticks)))
+
 ; Рисует объект block цвета color
 (defn redraw![block]
   (let [{color :color blocks :blocks} block]
@@ -129,13 +138,16 @@
   (let [  ctx (:context board)
           drawwer (fn[item](let [
             {col :x row :y filled :filled color :color} item
+            bgcolor (if filled color "#eee")
             el  (->
                   (sel (str "#game div.line:nth-child(" (inc row) ")"))
                   (sel (str "div.cell:nth-child(" (inc col) ")")))]
-            (set-styles! el {:background-color (if filled "#eee" color)})))]
-    (do
-      (mapv #(mapv drawwer %) ctx)
-      (redraw! (:current board)))))
+            (set-styles! el {:background-color bgcolor})))]
+
+    (if (:overloaded board) (loose! (:width board) (:height board))
+      (do 
+        (mapv #(mapv drawwer %) ctx)
+        (redraw! (:current board))))))
 
 ; Перерисовывает поле board (fictive остался для создания формулы, не знаю как избавиться)
 (defn redraw-full[board fictive]
@@ -151,7 +163,7 @@
 (defn filled?[block board]
   (let [context (:context board)
         {x :x y :y} block
-        is-block-filled? (some (fn[row] (some (fn[col](and (= block col) (:state col))) row)) context )
+        is-block-filled? (some (fn[row] (some (fn[col](and (utils/contain? col block) (:filled col))) row)) context )
         res (or (neg? x) 
               (>= y (:height board)) 
               (>= x (:width board))
@@ -204,6 +216,7 @@
               res {:width width :height height :context new-board}
         ]res))))
 
+
 ; Перемещает объект
 (defn move![event board]
   (let [  code (.-keyCode event)
@@ -214,6 +227,22 @@
         (swap! board (move-to! direction)) 
         nil)))
 
+(defn stack![direction]
+  (fn[board]
+    (let [{context :context width :width height :height current :current} board
+          fall (fn[block](let [{x :x y :y color :color} block]
+            { :x (+ x (:x direction)) 
+              :y (+ y (:y direction))
+              :color color }))
+          updateCell (fn[cell]
+            (let [{x :x y :y cf :filled cc :color} cell]
+              (if (some #(utils/contain? cell %) (:blocks current))
+                  {:x x :y y :color (:color current) :filled true}
+                  {:x x :y y :filled cf :color cc})))
+          updateRow #(mapv updateCell % )
+          ncontext (mapv updateRow context)
+          overloaded (some #(<= (:y %) 0) (:blocks current))]
+      { :context ncontext  :width width  :height height :current (create! width height) :overloaded overloaded })))
 
 ; То что происходит по onload body
 (defn ^:export start [width height]
@@ -238,37 +267,11 @@
 
   ; Задаем прослушку 
   (.addEventListener js/document "keydown" #(move! % board))
+  ; Задаем такты  
+  (def ticks (js/setInterval #(let [direction {:x 0 :y 1}]
+    (if (allowed? direction @board) 
+        (swap! board (move-to! direction))
+        (swap! board (stack! direction))))
+        600))
 
-  ; (defn step![]
-  ;   (if (stacked? board (:blocks (.-state block))) ; если объекту некуда двигаться, то 
-  ;     (do 
-  ;       (if (> (count (filter #(neg? (:y %)) (:blocks @block)))0) 
-  ;           (swap! overloaded toggle!)
-  ;           nil)
-  ;       (swap! board (conj-add block)) ; втыкаем в board текущий блок
-  ;       (reset! block (.-state (create! (:width (.-state board)) (:height (.-state board)))))) ; обновляем текущий block на новый созданный
-  ;     ;иначе
-  ;     (swap! block fall!)))
-
-  ;;;;;;;;;;;;;;;;;;;;;;; side effects	
-
-  ; Задаем такты	
-  ;(def ticks (js/setInterval step! 600))
-
-  ; (defn loose![over]
-  ;   (if over 
-  ;     (do 
-  ;       (set-html! 
-  ;         (->
-  ;           (sel "#game") 
-  ;           (add-class! "loosed")
-  ;           (set-styles! {:width (str (* width 16) "px") :height (str (* height 16) "px")}) )
-  ;         "<button class='btn btn-primary' onclick='tetris.core.start(10, 14)'>You loose!</button>" )
-  ;       (js/clearInterval ticks))  nil))
-
-  ; (defn analyze![board])
-
-  ; (cell= (loose! overloaded))
-  ; (cell= (redraw-full board block))
   (cell= (redraw-board! board)))
-  

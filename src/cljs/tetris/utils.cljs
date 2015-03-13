@@ -55,13 +55,13 @@
     (== (:y o) (:y n))))
 
 ; содержится ли объект block в blocks
-(defn contained? [block blocks]
-  (filter #() blocks)
-  )
+(defn contain? [a b]
+  (and  (= (:x a) (:x b))
+        (= (:y a) (:y b))))
 
 
 (defn code->direction[code]
   (let [diag (pos? (mod code 2))
         x (if diag (- code 38) 0)
         y (if diag 0 (- code 39))]
-   {:x x :y y}))
+   {:x x :y y}))  
