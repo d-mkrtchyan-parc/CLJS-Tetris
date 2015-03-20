@@ -1,15 +1,18 @@
 (ns tetris.utils)
 
+; вектор доступных объектов
 (def object-map [
-  [{:x 0 :y 0}] ; dot
-  [{:x 0 :y -1} {:x 0 :y 0}] ; two-dot
-  [{:x 0 :y -3} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0}] ; stick
-  [{:x 0 :y 0} {:x 0 :y -1} {:x -1 :y 0} {:x -1 :y -1}] ; square
-  [{:x 0 :y -1} {:x -1 :y 0 } {:x 0 :y 0} {:x 1 :y 0}] ; small t-figure
-  [{:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; L-figure
-  [{:x -1 :y -1} {:x 1 :y -1} {:x -1 :y 0} {:x 0 :y 0} {:x 1 :y 0}] ; П-figure
-  [{:x -1 :y -1} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; z-swipe-figure
-  [{:x -1 :y -2} {:x 0 :y -2} {:x 0 :y -1} {:x 0 :y 0} {:x 1 :y 0}] ; Z-figure
+  [[0  0]] ; dot
+  [[0  -1] [0  0]] ; two-dot
+  [[0   0] [0  -1] [-1 0] ] ; Г-figure-small
+  [[0  -3] [0  -2] [0 -1] [0   0]] ; stick
+  [[0   0] [0  -1] [-1 0] [-1 -1]] ; square
+  [[0  -1] [-1  0] [0  0] [1   0]] ; small t-figure
+  [[0  -2] [0  -1] [0  0] [1   0]] ; L-figure
+  [[1  -2] [0  -2] [0 -1] [0   0]] ; Г-figure
+  [[-1 -1] [0  -1] [0  0] [1   0]] ; z-swipe-figure
+  [[-1 -1] [1  -1] [-1 0] [0   0] [1 0]] ; П-figure
+  [[-1 -2] [0  -2] [0 -1] [0   0] [1 0]] ; Z-figure
 ])
 
 ; вектор доступных цветов
@@ -18,13 +21,8 @@
   "cyan" "navy" "black" "pink"
   "orange" "magenta" ])
 
-; возвращает случайный цвет в hex
-; (defn random-color[]
-;   (str "#" (.toString (Math/round (* (Math/random) 0xFFFFFF)) 16)))
-
 (defn random-color[]
-  (let [  color (nth color-map (Math/round (* (count color-map) (Math/random)))) 
-          _ (.log js/console color)] color)) 
+  (nth color-map (rand-int (count color-map))))
 
 ; вызывает fn count раз
 (defn repeat![c f]
@@ -37,31 +35,27 @@
 (defn indexOf? [v value cmp]
 	(> (count (filter #(cmp % value) v)) 0))
 
-; всегда возвращает obj ячейку в деструктурированном виде
-; TODO: подумать как избавиться от этой ерунды
-(defn always![obj]
-  (let [  result (mapv #(let [o (.-state %) 
-          res {:x (:x o) :y (:y o)}] res) obj)] 
-            (fn[] result)))
 
 ; Предикат на проверку движения влево/вправо по keyCode ивента
 (defn arrow? [code]
   (and (>= code 37) (<= code 40)))
 
-; компрактор двух объектов по ключевым словам x и y
-(defn o-cmp[o n]
-  (and 
-    (== (:x o) (:x n))
-    (== (:y o) (:y n))))
-
 ; содержится ли объект block в blocks
 (defn contain? [a b]
-  (and  (= (:x a) (:x b))
-        (= (:y a) (:y b))))
+  (and  (= (first a) (first b))
+        (= (second a) (second b))))
 
-
+; принимает keyCode и возвращает Vecto2 в формате [x y] -> {x, y}
 (defn code->direction[code]
-  (let [diag (pos? (mod code 2))
-        x (if diag (- code 38) 0)
-        y (if diag 0 (- code 39))]
-   {:x x :y y}))  
+  (let [diag (pos? (mod code 2))]
+    (vector 
+      (if diag (- code 38) 0)     ; x 
+      (if diag 0 (- code 39)))))  ; y
+
+(defn center[fig] ;where fig is vector of coors (e.g. [ [0 0] [0 1] [1 0] [1 1] ] ) 
+  "Finds figure central coors" 
+  (let [length (count fig) ; count of figure blocks 
+        average #(/ (reduce + (mapv % fig)) length) ; average abstract function
+        x (average first) ; x coor of center
+        y (average second)] ; y coor of center
+    (mapv Math/round (vector x y)))) ; result
